@@ -32,7 +32,7 @@ jobs:
 
       - name: Build
         # Dynamically set the base path to the repository name for correct asset loading
-        run: npm run build -- --base=.
+        run: npm run build -- --base='./'
 
       - name: Fix SPA Routing (404 Hack)
         # Copy index.html to 404.html so GitHub Pages serves the app on all routes
