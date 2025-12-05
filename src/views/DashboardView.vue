@@ -46,9 +46,14 @@
 
         <div v-else class="empty-state card p-xl text-center">
           <p class="mb-md">You haven't set up your financial profile yet.</p>
-          <router-link to="/financial-profiles" class="btn btn-primary">
-            Setup Profile
-          </router-link>
+          <div class="flex gap-sm justify-center">
+            <router-link to="/financial-profiles" class="btn btn-primary">
+              Setup Profile
+            </router-link>
+            <button @click="handleLoadDemo" class="btn btn-secondary" :disabled="loadingDemo">
+              {{ loadingDemo ? 'Loading...' : 'Load Demo Data' }}
+            </button>
+          </div>
         </div>
       </div>
 
@@ -84,9 +89,14 @@
 
         <div v-else class="empty-state card p-xl text-center">
           <p class="mb-md">No projects found.</p>
-          <router-link to="/projects" class="btn btn-primary">
-            Create Project
-          </router-link>
+          <div class="flex gap-sm justify-center">
+            <router-link to="/projects" class="btn btn-primary">
+              Create Project
+            </router-link>
+            <button @click="handleLoadDemo" class="btn btn-secondary" :disabled="loadingDemo">
+              {{ loadingDemo ? 'Loading...' : 'Load Demo Data' }}
+            </button>
+          </div>
         </div>
       </div>
     </div>
@@ -94,20 +104,39 @@
 </template>
 
 <script setup>
-import { onMounted } from 'vue';
+import { ref, onMounted } from 'vue';
 import { useAuthStore } from '../stores/auth';
 import { useUserStore } from '../stores/user';
 import { useProjectsStore } from '../stores/projects';
 import { formatCurrency, formatNumber } from '../utils/calculations';
+import { seedDemoData } from '../utils/demoLoader';
 
 const authStore = useAuthStore();
 const userStore = useUserStore();
 const projectsStore = useProjectsStore();
+const loadingDemo = ref(false);
 
 onMounted(async () => {
   await userStore.fetchProfile();
   await projectsStore.fetchProjects();
 });
+
+async function handleLoadDemo() {
+  if (!confirm("This will overwrite your current profile and add demo projects. Continue?")) return;
+
+  loadingDemo.value = true;
+  try {
+    await seedDemoData();
+    // Refresh data
+    await userStore.fetchProfile();
+    await projectsStore.fetchProjects();
+  } catch (e) {
+    console.error(e);
+    alert("Failed to load demo data: " + e.message);
+  } finally {
+    loadingDemo.value = false;
+  }
+}
 
 function getStatusClass(status) {
   switch (status?.toLowerCase()) {
