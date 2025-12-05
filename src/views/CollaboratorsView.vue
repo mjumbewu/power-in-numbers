@@ -62,20 +62,7 @@
             <span class="detail-value">{{ collaborator.email || 'Not provided' }}</span>
           </div>
 
-          <div class="detail-row">
-            <span class="detail-label">Equity Shares:</span>
-            <span class="detail-value">{{ formatNumber(getCollaboratorEquity(collaborator.id)) }}</span>
-          </div>
 
-          <div class="detail-row">
-            <span class="detail-label">Financial Profile:</span>
-            <RouterLink v-if="hasFinancialProfile(collaborator.id)" to="/financial-profiles" class="detail-link">
-              View Profile
-            </RouterLink>
-            <RouterLink v-else to="/financial-profiles" class="detail-link text-muted">
-              Create Profile
-            </RouterLink>
-          </div>
         </div>
 
         <div class="collab-actions">
@@ -90,15 +77,9 @@
 
 <script setup>
 import { ref } from 'vue';
-import { RouterLink } from 'vue-router';
 import { useCollaboratorsStore } from '../stores/collaborators.js';
-import { useFinancialProfilesStore } from '../stores/financialProfiles.js';
-import { useEquityStore } from '../stores/equity.js';
-import { formatNumber } from '../utils/calculations.js';
 
 const collaboratorsStore = useCollaboratorsStore();
-const financialProfilesStore = useFinancialProfilesStore();
-const equityStore = useEquityStore();
 
 const showAddForm = ref(false);
 const newCollaborator = ref({
@@ -108,6 +89,8 @@ const newCollaborator = ref({
 });
 
 function handleAddCollaborator() {
+  // For now, this just adds to local state/cache.
+  // In a real app, this would invite them via email.
   collaboratorsStore.addCollaborator({ ...newCollaborator.value });
   newCollaborator.value = { name: '', email: '', role: '' };
   showAddForm.value = false;
@@ -120,15 +103,7 @@ function deleteCollaborator(id) {
 }
 
 function getInitials(name) {
-  return name.split(' ').map(n => n[0]).join('').toUpperCase().slice(0, 2);
-}
-
-function getCollaboratorEquity(collaboratorId) {
-  return equityStore.getTotalSharesForCollaborator(collaboratorId);
-}
-
-function hasFinancialProfile(collaboratorId) {
-  return financialProfilesStore.getByCollaboratorId(collaboratorId).length > 0;
+  return name ? name.split(' ').map(n => n[0]).join('').toUpperCase().slice(0, 2) : '??';
 }
 </script>
 

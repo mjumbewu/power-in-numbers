@@ -1,594 +1,399 @@
 <template>
-  <div v-if="project" class="project-detail-view fade-in">
-    <button @click="$router.back()" class="btn btn-secondary mb-lg">← Back to Projects</button>
-
-    <div class="project-header">
-      <div>
-        <h1>{{ project.name }}</h1>
-        <p class="text-secondary">{{ project.description }}</p>
-      </div>
-      <span class="badge badge-lg" :class="`badge-${getStatusColor(project.status)}`">
-        {{ project.status }}
-      </span>
-    </div>
-
-    <div class="tabs">
-      <button @click="activeTab = 'scenarios'"
-              class="tab"
-              :class="{ active: activeTab === 'scenarios' }">
-        Budget Scenarios
-      </button>
-      <button @click="activeTab = 'phases'"
-              class="tab"
-              :class="{ active: activeTab === 'phases' }">
-        Phases
-      </button>
-      <button @click="activeTab = 'income'"
-              class="tab"
-              :class="{ active: activeTab === 'income' }">
-        Income Sources
-      </button>
-    </div>
-
-    <!-- Budget Scenarios Tab -->
-    <div v-if="activeTab === 'scenarios'" class="tab-content">
-      <div class="section-header">
-        <h2>Budget Scenarios</h2>
-        <button @click="showScenarioForm = true" class="btn btn-primary">+ Add Scenario</button>
+  <div class="project-detail-view container" v-if="project">
+    <div class="header-section mb-xl">
+      <div class="flex items-center gap-sm text-sm text-secondary mb-sm">
+        <router-link to="/projects">Projects</router-link>
+        <span>/</span>
+        <span>{{ project.name }}</span>
       </div>
 
-      <div v-if="showScenarioForm" class="card mb-lg">
-        <div class="card-header">
-          <h3>Create Budget Scenario</h3>
-          <button @click="showScenarioForm = false" class="btn btn-sm btn-secondary">Cancel</button>
+      <div class="flex justify-between items-start">
+        <div>
+          <h1 class="page-title">{{ project.name }}</h1>
+          <div class="flex items-center gap-md">
+            <span class="badge" :class="getStatusClass(project.status)">{{ project.status }}</span>
+            <span class="text-secondary text-sm">Created {{ formatDate(project.createdAt) }}</span>
+          </div>
         </div>
-        <form @submit.prevent="handleCreateScenario" class="card-body">
-          <div class="form-group">
-            <label class="form-label">Scenario Name *</label>
-            <input v-model="newScenario.name" type="text" class="form-input" required placeholder="e.g., Dream Scenario" />
-          </div>
-
-          <div class="form-group">
-            <label class="form-label">Description</label>
-            <textarea v-model="newScenario.description" class="form-textarea" placeholder="Brief description"></textarea>
-          </div>
-
-          <div class="grid grid-cols-2">
-            <div class="form-group">
-              <label class="form-label">Wage Floor ($/hr)</label>
-              <input v-model.number="newScenario.wageFloor" type="number" class="form-input" placeholder="100" />
-            </div>
-
-            <div class="form-group">
-              <label class="form-label">% of Goal Rate</label>
-              <input v-model.number="newScenario.percentageOfGoal" type="number" class="form-input" min="0" max="200" placeholder="65" />
-            </div>
-          </div>
-
-          <button type="submit" class="btn btn-accent">Create Scenario</button>
-        </form>
-      </div>
-
-      <div v-if="scenarios.length === 0" class="empty-state card">
-        <p class="text-muted">No budget scenarios yet. Create one to start budgeting!</p>
-      </div>
-
-      <div v-else class="scenarios-grid grid grid-cols-3">
-        <div v-for="scenario in scenarios" :key="scenario.id" class="scenario-card card">
-          <div class="card-header">
-            <h3>{{ scenario.name }}</h3>
-          </div>
-          <div class="card-body">
-            <p class="text-secondary mb-md">{{ scenario.description }}</p>
-
-            <div class="scenario-rules mb-md">
-              <div class="rule">
-                <span class="rule-label">Wage Floor:</span>
-                <span class="rule-value">{{ formatCurrency(scenario.wageFloor) }}/hr</span>
-              </div>
-              <div class="rule">
-                <span class="rule-label">% of Goal:</span>
-                <span class="rule-value">{{ scenario.percentageOfGoal }}%</span>
-              </div>
-            </div>
-
-            <div class="scenario-budget">
-              <div class="budget-summary">
-                <strong>Total Budget:</strong>
-                <strong class="budget-value">{{ formatCurrency(getScenarioBudget(scenario.id).total) }}</strong>
-              </div>
-              <div class="budget-breakdown">
-                <span class="text-muted">Labor: {{ formatCurrency(getScenarioBudget(scenario.id).laborCosts) }}</span>
-                <span class="text-muted">Expenses: {{ formatCurrency(getScenarioBudget(scenario.id).expenseCosts) }}</span>
-              </div>
-            </div>
-
-            <div class="scenario-actions mt-md">
-              <button @click="deleteScenario(scenario.id)" class="btn btn-sm btn-secondary">Delete</button>
-            </div>
-          </div>
+        <div class="flex gap-sm">
+          <button @click="showInviteModal = true" class="btn btn-secondary">
+            + Invite Collaborator
+          </button>
+          <button @click="saveProject" class="btn btn-primary">
+            Save Changes
+          </button>
         </div>
       </div>
     </div>
 
-    <!-- Phases Tab -->
-    <div v-if="activeTab === 'phases'" class="tab-content">
-      <div class="section-header">
-        <h2>Project Phases</h2>
-        <button @click="showPhaseForm = !showPhaseForm" class="btn btn-primary">+ Add Phase</button>
-      </div>
+    <!-- Tabs -->
+    <div class="tabs mb-lg">
+      <button
+        v-for="tab in tabs"
+        :key="tab.id"
+        @click="currentTab = tab.id"
+        class="tab-btn"
+        :class="{ active: currentTab === tab.id }"
+      >
+        {{ tab.label }}
+      </button>
+    </div>
 
-      <div v-if="showPhaseForm" class="card mb-lg">
-        <form @submit.prevent="handleCreatePhase" class="card-body">
-          <div class="grid grid-cols-2">
-            <div class="form-group">
-              <label class="form-label">Phase Name *</label>
-              <input v-model="newPhase.name" type="text" class="form-input" required placeholder="e.g., Creation" />
-            </div>
-            <div class="form-group">
-              <label class="form-label">Start Date</label>
-              <input v-model="newPhase.startDate" type="date" class="form-input" />
-            </div>
-          </div>
+    <!-- Tab Content -->
+    <div class="tab-content">
 
-          <div class="grid grid-cols-2">
-            <div class="form-group">
-              <label class="form-label">Duration (weeks)</label>
-              <input v-model.number="newPhase.durationWeeks" type="number" class="form-input" placeholder="12" />
+      <!-- Budget Scenarios Tab -->
+      <div v-if="currentTab === 'scenarios'" class="scenarios-tab">
+        <div class="grid grid-cols-3 gap-lg mb-xl">
+          <div v-for="scenario in scenarios" :key="scenario.id" class="scenario-card card">
+            <div class="card-header">
+              <h3 class="card-title">{{ scenario.name }}</h3>
+              <div class="scenario-meta text-sm text-secondary">
+                Floor: {{ formatCurrency(scenario.wageFloor) }} • {{ scenario.payPercentage }}%
+              </div>
             </div>
-            <div class="form-group">
-              <label class="form-label">Hours per Week</label>
-              <input v-model.number="newPhase.workloadHoursPerWeek" type="number" class="form-input" placeholder="30" />
-            </div>
-          </div>
+            <div class="card-body">
+              <div class="budget-summary mb-md">
+                <div class="text-3xl font-bold text-primary mb-xs">
+                  {{ formatCurrency(calculateScenarioTotal(scenario)) }}
+                </div>
+                <div class="text-sm text-secondary">Total Budget</div>
+              </div>
 
-          <button type="submit" class="btn btn-accent">Add Phase</button>
-        </form>
-      </div>
-
-      <div v-if="!project.phases || project.phases.length === 0" class="empty-state card">
-        <p class="text-muted">No phases yet. Add phases to organize your project timeline!</p>
-      </div>
-
-      <div v-else class="phases-list">
-        <div v-for="phase in project.phases" :key="phase.id" class="phase-card card">
-          <h3>{{ phase.name }}</h3>
-          <div class="phase-details">
-            <div class="detail-item">
-              <span class="detail-label">Duration:</span>
-              <span>{{ phase.durationWeeks }} weeks</span>
-            </div>
-            <div class="detail-item">
-              <span class="detail-label">Workload:</span>
-              <span>{{ phase.workloadHoursPerWeek }} hrs/week</span>
-            </div>
-            <div class="detail-item">
-              <span class="detail-label">Total Hours:</span>
-              <span>{{ phase.durationWeeks * phase.workloadHoursPerWeek }} hours</span>
-            </div>
-            <div class="detail-item">
-              <span class="detail-label">Start Date:</span>
-              <span>{{ phase.startDate || 'TBD' }}</span>
+              <!-- Collaborator Breakdown -->
+              <div class="collaborator-breakdown">
+                <div v-for="member in projectMembers" :key="member.id" class="flex justify-between text-sm py-xs border-b border-light">
+                  <span>{{ member.displayName }}</span>
+                  <span>{{ formatCurrency(calculateMemberPay(member, scenario)) }}</span>
+                </div>
+              </div>
             </div>
           </div>
         </div>
       </div>
-    </div>
 
-    <!-- Income Sources Tab -->
-    <div v-if="activeTab === 'income'" class="tab-content">
-      <div class="section-header">
-        <h2>Income Sources</h2>
-        <button @click="showIncomeForm = !showIncomeForm" class="btn btn-primary">+ Add Income Source</button>
-      </div>
-
-      <div v-if="showIncomeForm" class="card mb-lg">
-        <form @submit.prevent="handleCreateIncomeSource" class="card-body">
-          <div class="grid grid-cols-2">
-            <div class="form-group">
-              <label class="form-label">Source Name *</label>
-              <input v-model="newIncomeSource.name" type="text" class="form-input" required placeholder="e.g., NEA Grant" />
-            </div>
-            <div class="form-group">
-              <label class="form-label">Amount ($)</label>
-              <input v-model.number="newIncomeSource.amount" type="number" class="form-input" placeholder="50000" />
-            </div>
+      <!-- Income Sources Tab -->
+      <div v-if="currentTab === 'income'" class="income-tab">
+        <div class="card p-lg">
+          <div class="flex justify-between items-center mb-lg">
+            <h3 class="card-title">Income Sources</h3>
+            <button @click="addIncomeSource" class="btn btn-sm btn-secondary">+ Add Source</button>
           </div>
 
-          <div class="grid grid-cols-2">
-            <div class="form-group">
-              <label class="form-label">Status</label>
-              <select v-model="newIncomeSource.status" class="form-select">
+          <div class="income-list flex flex-col gap-md">
+            <div v-for="(source, index) in project.incomeSources" :key="source.id" class="income-item flex gap-md items-center">
+              <input v-model="source.name" class="form-input" placeholder="Grant / Funder Name" />
+              <input v-model.number="source.amount" type="number" class="form-input w-32" placeholder="Amount" />
+              <select v-model="source.status" class="form-select w-40">
                 <option value="confirmed">Confirmed</option>
-                <option value="likely">Likely</option>
+                <option value="pending">Pending</option>
+                <option value="projected">Projected</option>
               </select>
+              <button @click="removeIncomeSource(index)" class="btn btn-sm btn-text text-error">×</button>
             </div>
-            <div class="form-group">
-              <label class="form-label">Received Date</label>
-              <input v-model="newIncomeSource.receivedDate" type="date" class="form-input" />
-            </div>
-          </div>
-
-          <button type="submit" class="btn btn-accent">Add Income Source</button>
-        </form>
-      </div>
-
-      <div v-if="!project.incomeSources || project.incomeSources.length === 0" class="empty-state card">
-        <p class="text-muted">No income sources yet. Add funding sources to track your project budget!</p>
-      </div>
-
-      <div v-else>
-        <div class="income-summary card mb-lg">
-          <h3>Funding Summary</h3>
-          <div class="summary-grid">
-            <div class="summary-item">
-              <div class="summary-label">Confirmed Income</div>
-              <div class="summary-value confirmed">{{ formatCurrency(confirmedIncome) }}</div>
-            </div>
-            <div class="summary-item">
-              <div class="summary-label">Likely Income</div>
-              <div class="summary-value likely">{{ formatCurrency(likelyIncome) }}</div>
-            </div>
-            <div class="summary-item">
-              <div class="summary-label">Total Income</div>
-              <div class="summary-value total">{{ formatCurrency(totalIncome) }}</div>
+             <div v-if="!project.incomeSources?.length" class="text-center text-muted py-md">
+              No income sources added yet.
             </div>
           </div>
         </div>
+      </div>
 
-        <div class="income-list">
-          <div v-for="source in project.incomeSources" :key="source.id" class="income-card card">
-            <div class="income-header">
-              <h3>{{ source.name }}</h3>
-              <span class="badge" :class="source.status === 'confirmed' ? 'badge-success' : 'badge-warning'">
-                {{ source.status }}
-              </span>
-            </div>
-            <div class="income-details">
-              <div class="income-amount">{{ formatCurrency(source.amount) }}</div>
-              <div class="income-date text-muted">
-                {{ source.receivedDate ? `Received: ${source.receivedDate}` : 'Pending' }}
-              </div>
-            </div>
+    </div>
+
+    <!-- Invite Modal -->
+    <div v-if="showInviteModal" class="modal-overlay" @click.self="showInviteModal = false">
+      <div class="modal-card card">
+        <div class="modal-header mb-lg">
+          <h2 class="modal-title">Invite Collaborator</h2>
+          <button @click="showInviteModal = false" class="close-btn">×</button>
+        </div>
+
+        <div class="modal-body">
+          <div class="form-group">
+            <label class="form-label">Email Address</label>
+            <input
+              v-model="inviteEmail"
+              type="email"
+              class="form-input"
+              placeholder="colleague@example.com"
+              @keyup.enter="handleInvite"
+            />
+          </div>
+
+          <div v-if="inviteError" class="alert alert-error mb-md">
+            {{ inviteError }}
+          </div>
+
+          <div v-if="inviteSuccess" class="alert alert-success mb-md">
+            {{ inviteSuccess }}
+          </div>
+
+          <div class="flex justify-end gap-sm">
+            <button @click="showInviteModal = false" class="btn btn-secondary">Cancel</button>
+            <button @click="handleInvite" class="btn btn-primary" :disabled="inviting">
+              {{ inviting ? 'Inviting...' : 'Send Invite' }}
+            </button>
           </div>
         </div>
       </div>
     </div>
-  </div>
 
-  <div v-else class="loading">
-    <p>Loading project...</p>
+  </div>
+  <div v-else class="loading-view container text-center p-xl">
+    Loading project...
   </div>
 </template>
 
 <script setup>
 import { ref, computed, onMounted } from 'vue';
-import { useRoute, useRouter } from 'vue-router';
-import { useProjectsStore } from '../stores/projects.js';
-import { useScenariosStore } from '../stores/scenarios.js';
-import { formatCurrency } from '../utils/calculations.js';
+import { useRoute } from 'vue-router';
+import { useProjectsStore } from '../stores/projects';
+import { useCollaboratorsStore } from '../stores/collaborators';
+import { formatCurrency } from '../utils/calculations';
 
 const route = useRoute();
-const router = useRouter();
 const projectsStore = useProjectsStore();
-const scenariosStore = useScenariosStore();
+const collaboratorsStore = useCollaboratorsStore();
 
-const activeTab = ref('scenarios');
-const showScenarioForm = ref(false);
-const showPhaseForm = ref(false);
-const showIncomeForm = ref(false);
+const project = ref(null);
+const currentTab = ref('scenarios');
+const showInviteModal = ref(false);
+const inviteEmail = ref('');
+const inviting = ref(false);
+const inviteError = ref(null);
+const inviteSuccess = ref(null);
+const projectMembers = ref([]);
 
-const newScenario = ref({
-  name: '',
-  description: '',
-  wageFloor: 100,
-  percentageOfGoal: 65
-});
+const tabs = [
+  { id: 'scenarios', label: 'Budget Scenarios' },
+  { id: 'income', label: 'Income Sources' },
+  { id: 'phases', label: 'Phases & Schedule' }
+];
 
-const newPhase = ref({
-  name: '',
-  startDate: '',
-  durationWeeks: 12,
-  workloadHoursPerWeek: 30
-});
-
-const newIncomeSource = ref({
-  name: '',
-  amount: 0,
-  status: 'likely',
-  receivedDate: ''
-});
-
-const project = computed(() => {
-  return projectsStore.getById(route.params.id);
-});
-
+// Computed Scenarios (ensure we have defaults)
 const scenarios = computed(() => {
-  return scenariosStore.getByProjectId(route.params.id);
+  if (!project.value?.scenarios) return [];
+  return Object.values(project.value.scenarios);
 });
 
-const confirmedIncome = computed(() => {
-  return project.value?.incomeSources
-    ?.filter(s => s.status === 'confirmed')
-    .reduce((sum, s) => sum + s.amount, 0) || 0;
+onMounted(async () => {
+  await loadProject();
 });
 
-const likelyIncome = computed(() => {
-  return project.value?.incomeSources
-    ?.filter(s => s.status === 'likely')
-    .reduce((sum, s) => sum + s.amount, 0) || 0;
-});
+async function loadProject() {
+  await projectsStore.fetchProjects();
+  project.value = projectsStore.getById(route.params.id);
 
-const totalIncome = computed(() => confirmedIncome.value + likelyIncome.value);
-
-function getStatusColor(status) {
-  const colors = {
-    active: 'success',
-    planning: 'info',
-    completed: 'primary',
-    paused: 'warning'
-  };
-  return colors[status] || 'primary';
+  if (project.value) {
+    await loadMembers();
+  }
 }
 
-function getScenarioBudget(scenarioId) {
-  return scenariosStore.getScenarioBudget(scenarioId);
+async function loadMembers() {
+  if (!project.value.members) return;
+
+  const memberIds = Object.keys(project.value.members);
+  await collaboratorsStore.fetchUsersByIds(memberIds);
+
+  projectMembers.value = memberIds.map(id => {
+    const user = collaboratorsStore.getById(id);
+    return user ? { ...user, role: project.value.members[id].role } : null;
+  }).filter(Boolean);
 }
 
-function handleCreateScenario() {
-  scenariosStore.addScenario({
-    projectId: route.params.id,
-    ...newScenario.value
+async function handleInvite() {
+  if (!inviteEmail.value) return;
+
+  inviting.value = true;
+  inviteError.value = null;
+  inviteSuccess.value = null;
+
+  try {
+    const user = await collaboratorsStore.findUserByEmail(inviteEmail.value);
+
+    if (!user) {
+      inviteError.value = "User not found. They must sign up first.";
+    } else {
+      // Add to project members
+      const updatedMembers = {
+        ...project.value.members,
+        [user.id]: { role: 'collaborator' }
+      };
+
+      await projectsStore.updateProject(project.value.id, { members: updatedMembers });
+
+      inviteSuccess.value = `Added ${user.displayName} to the project!`;
+      inviteEmail.value = '';
+
+      // Reload members
+      await loadMembers();
+
+      setTimeout(() => {
+        showInviteModal.value = false;
+        inviteSuccess.value = null;
+      }, 1500);
+    }
+  } catch (error) {
+    inviteError.value = error.message;
+  } finally {
+    inviting.value = false;
+  }
+}
+
+function calculateScenarioTotal(scenario) {
+  // Simplified calculation for display
+  let total = 0;
+  projectMembers.value.forEach(member => {
+    total += calculateMemberPay(member, scenario);
   });
-  newScenario.value = {
-    name: '',
-    description: '',
-    wageFloor: 100,
-    percentageOfGoal: 65
-  };
-  showScenarioForm.value = false;
+  return total;
 }
 
-function handleCreatePhase() {
-  projectsStore.addPhase(route.params.id, { ...newPhase.value });
-  newPhase.value = {
-    name: '',
-    startDate: '',
-    durationWeeks: 12,
-    workloadHoursPerWeek: 30
-  };
-  showPhaseForm.value = false;
+function calculateMemberPay(member, scenario) {
+  // Get member's goal rate from their profile (or default)
+  const goalRate = member.financialData?.goalHourly || 0;
+
+  // Apply scenario logic (wage floor, percentage)
+  const effectiveRate = Math.max(
+    scenario.wageFloor,
+    goalRate * (scenario.payPercentage / 100)
+  );
+
+  // Multiply by assigned hours (defaulting to 100 for MVP display)
+  const hours = 100;
+
+  return effectiveRate * hours;
 }
 
-function handleCreateIncomeSource() {
-  projectsStore.addIncomeSource(route.params.id, { ...newIncomeSource.value });
-  newIncomeSource.value = {
+async function saveProject() {
+  if (!project.value) return;
+  await projectsStore.updateProject(project.value.id, {
+    incomeSources: project.value.incomeSources
+  });
+}
+
+function addIncomeSource() {
+  if (!project.value.incomeSources) project.value.incomeSources = [];
+  project.value.incomeSources.push({
+    id: Date.now().toString(),
     name: '',
     amount: 0,
-    status: 'likely',
-    receivedDate: ''
-  };
-  showIncomeForm.value = false;
+    status: 'projected'
+  });
 }
 
-function deleteScenario(id) {
-  if (confirm('Delete this scenario and all its line items?')) {
-    scenariosStore.deleteScenario(id);
+function removeIncomeSource(index) {
+  project.value.incomeSources.splice(index, 1);
+}
+
+function getStatusClass(status) {
+  switch (status?.toLowerCase()) {
+    case 'active': return 'badge-success';
+    case 'planning': return 'badge-info';
+    case 'completed': return 'badge-primary';
+    default: return 'badge-secondary';
   }
 }
 
-onMounted(() => {
-  if (!project.value) {
-    router.push('/projects');
-  }
-});
+function formatDate(timestamp) {
+  if (!timestamp) return '';
+  const date = timestamp.toDate ? timestamp.toDate() : new Date(timestamp);
+  return date.toLocaleDateString();
+}
+
+
 </script>
 
 <style scoped>
-.project-header {
-  display: flex;
-  justify-content: space-between;
-  align-items: flex-start;
-  margin-bottom: var(--space-2xl);
+.project-detail-view {
+  padding-top: var(--space-xl);
+  padding-bottom: var(--space-xl);
 }
 
-.badge-lg {
-  padding: var(--space-sm) var(--space-lg);
-  font-size: var(--font-size-base);
+.page-title {
+  margin-bottom: var(--space-xs);
 }
 
 .tabs {
   display: flex;
-  gap: var(--space-sm);
-  margin-bottom: var(--space-xl);
-  border-bottom: 2px solid var(--color-border);
+  gap: var(--space-md);
+  border-bottom: 1px solid var(--color-border);
 }
 
-.tab {
+.tab-btn {
   padding: var(--space-md) var(--space-lg);
-  background: transparent;
+  background: none;
   border: none;
-  color: var(--color-text-secondary);
-  font-size: var(--font-size-base);
   font-weight: var(--font-weight-medium);
+  color: var(--color-text-secondary);
   cursor: pointer;
   position: relative;
-  transition: all var(--transition-base);
 }
 
-.tab::after {
+.tab-btn.active {
+  color: var(--color-primary);
+}
+
+.tab-btn.active::after {
   content: '';
   position: absolute;
-  bottom: -2px;
+  bottom: -1px;
   left: 0;
-  right: 0;
+  width: 100%;
   height: 2px;
-  background: var(--gradient-primary);
-  transform: scaleX(0);
-  transition: transform var(--transition-base);
+  background: var(--color-primary);
 }
 
-.tab:hover {
-  color: var(--color-text-primary);
+.modal-overlay {
+  position: fixed;
+  top: 0;
+  left: 0;
+  width: 100%;
+  height: 100%;
+  background: rgba(0, 0, 0, 0.5);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 1000;
 }
 
-.tab.active {
-  color: var(--color-primary);
+.modal-card {
+  width: 100%;
+  max-width: 500px;
+  background: white;
 }
 
-.tab.active::after {
-  transform: scaleX(1);
-}
-
-.section-header {
+.modal-header {
   display: flex;
   justify-content: space-between;
   align-items: center;
-  margin-bottom: var(--space-xl);
 }
 
-.scenarios-grid {
-  gap: var(--space-lg);
+.close-btn {
+  background: none;
+  border: none;
+  font-size: var(--font-size-xl);
+  cursor: pointer;
+  color: var(--color-text-secondary);
 }
 
-.scenario-rules {
-  display: flex;
-  flex-direction: column;
-  gap: var(--space-sm);
+.alert-success {
+  background: var(--color-success);
+  color: white;
   padding: var(--space-md);
-  background: var(--color-bg-tertiary);
   border-radius: var(--radius-md);
 }
 
-.rule {
-  display: flex;
-  justify-content: space-between;
-  font-size: var(--font-size-sm);
-}
-
-.rule-label {
-  color: var(--color-text-muted);
-}
-
-.rule-value {
-  color: var(--color-text-primary);
-  font-weight: var(--font-weight-medium);
-}
-
-.scenario-budget {
+.alert-error {
+  background: var(--color-error);
+  color: white;
   padding: var(--space-md);
-  background: var(--gradient-card);
-  border: 1px solid var(--color-border);
   border-radius: var(--radius-md);
 }
 
-.budget-summary {
-  display: flex;
-  justify-content: space-between;
-  margin-bottom: var(--space-sm);
-}
-
-.budget-value {
-  color: var(--color-primary);
-  font-size: var(--font-size-lg);
-}
-
-.budget-breakdown {
-  display: flex;
-  justify-content: space-between;
-  font-size: var(--font-size-xs);
-}
-
-.phases-list {
-  display: grid;
-  gap: var(--space-md);
-}
-
-.phase-card h3 {
-  margin-bottom: var(--space-md);
-}
-
-.phase-details {
-  display: grid;
-  grid-template-columns: repeat(2, 1fr);
-  gap: var(--space-sm);
-}
-
-.detail-item {
-  display: flex;
-  gap: var(--space-sm);
-  font-size: var(--font-size-sm);
-}
-
-.detail-label {
-  color: var(--color-text-muted);
-  font-weight: var(--font-weight-medium);
-}
-
-.income-summary {
-  background: var(--gradient-card);
-}
-
-.summary-grid {
-  display: grid;
-  grid-template-columns: repeat(3, 1fr);
-  gap: var(--space-lg);
-  margin-top: var(--space-md);
-}
-
-.summary-item {
-  text-align: center;
-}
-
-.summary-label {
-  font-size: var(--font-size-sm);
-  color: var(--color-text-muted);
-  margin-bottom: var(--space-xs);
-}
-
-.summary-value {
-  font-size: var(--font-size-2xl);
-  font-weight: var(--font-weight-bold);
-}
-
-.summary-value.confirmed {
-  color: var(--color-success);
-}
-
-.summary-value.likely {
-  color: var(--color-warning);
-}
-
-.summary-value.total {
-  color: var(--color-primary);
-}
-
-.income-list {
-  display: grid;
-  grid-template-columns: repeat(2, 1fr);
-  gap: var(--space-md);
-}
-
-.income-header {
-  display: flex;
-  justify-content: space-between;
-  align-items: center;
-  margin-bottom: var(--space-md);
-}
-
-.income-amount {
-  font-size: var(--font-size-2xl);
-  font-weight: var(--font-weight-bold);
-  color: var(--color-primary);
-  margin-bottom: var(--space-xs);
-}
-
-.income-date {
-  font-size: var(--font-size-sm);
-}
-
-.empty-state {
-  text-align: center;
-  padding: var(--space-2xl);
-}
+.w-32 { width: 8rem; }
+.w-40 { width: 10rem; }
+.border-b { border-bottom-width: 1px; }
+.border-light { border-color: var(--color-border-light); }
+.py-xs { padding-top: var(--space-xs); padding-bottom: var(--space-xs); }
 </style>

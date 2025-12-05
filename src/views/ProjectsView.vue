@@ -107,10 +107,8 @@
 import { ref } from 'vue';
 import { RouterLink } from 'vue-router';
 import { useProjectsStore } from '../stores/projects.js';
-import { useScenariosStore } from '../stores/scenarios.js';
 
 const projectsStore = useProjectsStore();
-const scenariosStore = useScenariosStore();
 
 const showAddForm = ref(false);
 const newProject = ref({
@@ -144,7 +142,8 @@ function getStatusColor(status) {
 }
 
 function getScenariosCount(projectId) {
-  return scenariosStore.getByProjectId(projectId).length;
+  const project = projectsStore.getById(projectId);
+  return project?.scenarios ? Object.keys(project.scenarios).length : 0;
 }
 
 function formatDate(dateStr) {
