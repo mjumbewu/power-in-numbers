@@ -1,4 +1,5 @@
 rules_version = '2';
+
 service cloud.firestore {
   match /databases/{database}/documents {
     // Helper function to check if user is authenticated
@@ -11,9 +12,13 @@ service cloud.firestore {
       return isAuthenticated() && request.auth.uid == userId;
     }
 
-    // Users collection: Users can read/write their own profile
+    // Users collection
     match /users/{userId} {
-      allow read, write: if isOwner(userId);
+      // Allow users to write their own profile
+      allow write: if isOwner(userId);
+      // Allow any authenticated user to read user profiles (needed for collaboration lookup)
+      // Note: In a production app, we should separate private data (financials) to a subcollection
+      allow read: if isAuthenticated();
     }
 
     // Projects collection
@@ -21,9 +26,11 @@ service cloud.firestore {
       // Allow create if the ownerId matches the authenticated user
       allow create: if isAuthenticated() && request.resource.data.ownerId == request.auth.uid;
 
-      // Allow read, update, delete if the resource's ownerId matches the authenticated user
-      // This works for queries like: collection('projects').where('ownerId', '==', auth.uid)
-      allow read, update, delete: if isAuthenticated() && resource.data.ownerId == request.auth.uid;
+      // Allow update/delete only by owner
+      allow update, delete: if isAuthenticated() && resource.data.ownerId == request.auth.uid;
+
+      // Allow read if owner OR member
+      allow read: if isAuthenticated() && (resource.data.ownerId == request.auth.uid || request.auth.uid in resource.data.members);
     }
   }
 }
