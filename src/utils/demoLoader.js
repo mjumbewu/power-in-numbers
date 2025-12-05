@@ -109,7 +109,6 @@ export async function seedDemoData() {
 
         return true;
     } catch (error) {
-        console.error("Error seeding demo data:", error);
         // Fallback: If batch failed (likely due to permission on other users),
         // try seeding ONLY the current user's data and project (without fake members)
         if (error.code === 'permission-denied') {
@@ -117,6 +116,8 @@ export async function seedDemoData() {
             await seedUserDataOnly(user, financialData, demoProject, scenariosMap);
             return true;
         }
+
+        console.error("Error seeding demo data:", error);
         throw error;
     }
 }

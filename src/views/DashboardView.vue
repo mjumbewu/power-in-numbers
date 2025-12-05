@@ -122,8 +122,6 @@ onMounted(async () => {
 });
 
 async function handleLoadDemo() {
-  if (!confirm("This will overwrite your current profile and add demo projects. Continue?")) return;
-
   loadingDemo.value = true;
   try {
     await seedDemoData();
